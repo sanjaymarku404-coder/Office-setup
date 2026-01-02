@@ -1,0 +1,636 @@
+{
+  "name": "Car Detailing Daily Email Campaign",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        240
+      ],
+      "id": "schedule-trigger-node",
+      "name": "Daily Schedule (9 AM)"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "dataMode": "autoMapInputData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -200,
+        240
+      ],
+      "id": "google-sheets-read-node",
+      "name": "Read Business List",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "timestamp-field",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "batch-id-field",
+              "name": "batchId",
+              "value": "={{ $now.format('yyyyMMdd_HHmmss') }}",
+              "type": "string"
+            },
+            {
+              "id": "total-count-field",
+              "name": "totalBusinesses",
+              "value": "={{ $json.length }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        240
+      ],
+      "id": "add-metadata-node",
+      "name": "Add Batch Metadata"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=1",
+          "mode": "list",
+          "cachedResultName": "Email Log"
+        },
+        "dataMode": "autoMapInputData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        200,
+        240
+      ],
+      "id": "log-batch-start-node",
+      "name": "Log Batch Start",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        400,
+        240
+      ],
+      "id": "split-in-batches-node",
+      "name": "Loop Over Businesses"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "email-not-empty-condition",
+              "leftValue": "={{ $json.Email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "business-owner-name-not-empty",
+              "leftValue": "={{ $json['Business Owner Name'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.1,
+      "position": [
+        600,
+        240
+      ],
+      "id": "validate-data-node",
+      "name": "Validate Data"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "email-subject-field",
+              "name": "emailSubject",
+              "value": "Missed calls = missed car detailing bookings",
+              "type": "string"
+            },
+            {
+              "id": "email-body-field",
+              "name": "emailBody",
+              "value": "Hi {{ $json['Business Owner Name'] }},\n\nQuick question — what happens when a customer calls while you're busy detailing a car?\nMost detailing businesses lose bookings simply because no one answers instantly.\n\nI've built an **AI receptionist** made specifically for car detailers.\nIt answers calls & WhatsApp messages, books appointments, shares pricing, and follows up — 24/7.\nNo hiring, no apps, works with your current number.\n\nIf this could bring you more bookings this month,\ncan I show you a quick 10-minute demo?\n\n– Sanjay",
+              "type": "string"
+            },
+            {
+              "id": "recipient-email-field",
+              "name": "recipientEmail",
+              "value": "={{ $json.Email }}",
+              "type": "string"
+            },
+            {
+              "id": "business-owner-name-field",
+              "name": "businessOwnerName",
+              "value": "={{ $json['Business Owner Name'] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        800,
+        160
+      ],
+      "id": "prepare-email-template-node",
+      "name": "Prepare Email Template"
+    },
+    {
+      "parameters": {
+        "fromEmail": "your-email@gmail.com",
+        "toEmail": "={{ $json.recipientEmail }}",
+        "subject": "={{ $json.emailSubject }}",
+        "emailType": "text",
+        "message": "={{ $json.emailBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1000,
+        160
+      ],
+      "id": "send-email-node",
+      "name": "Send Email (Gmail)",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "log-status-success",
+              "name": "status",
+              "value": "success",
+              "type": "string"
+            },
+            {
+              "id": "log-email-field",
+              "name": "email",
+              "value": "={{ $('Prepare Email Template').item.json.recipientEmail }}",
+              "type": "string"
+            },
+            {
+              "id": "log-business-name-field",
+              "name": "businessOwnerName",
+              "value": "={{ $('Prepare Email Template').item.json.businessOwnerName }}",
+              "type": "string"
+            },
+            {
+              "id": "log-timestamp-field",
+              "name": "sentAt",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "log-message-field",
+              "name": "message",
+              "value": "Email sent successfully",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        160
+      ],
+      "id": "log-success-node",
+      "name": "Log Success"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "log-status-skipped",
+              "name": "status",
+              "value": "skipped",
+              "type": "string"
+            },
+            {
+              "id": "log-email-skipped",
+              "name": "email",
+              "value": "={{ $json.Email || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "log-business-skipped",
+              "name": "businessOwnerName",
+              "value": "={{ $json['Business Owner Name'] || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "log-timestamp-skipped",
+              "name": "sentAt",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "log-message-skipped",
+              "name": "message",
+              "value": "Skipped - Missing email or business owner name",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        800,
+        320
+      ],
+      "id": "log-skipped-node",
+      "name": "Log Skipped"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=1",
+          "mode": "list",
+          "cachedResultName": "Email Log"
+        },
+        "dataMode": "autoMapInputData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1400,
+        240
+      ],
+      "id": "write-log-to-sheet-node",
+      "name": "Write Log to Sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1600,
+        240
+      ],
+      "id": "wait-node",
+      "name": "Wait (Rate Limiting)"
+    },
+    {
+      "parameters": {
+        "errorMessage": "={{ $json.message }}"
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        380
+      ],
+      "id": "handle-error-node",
+      "name": "Handle Send Error"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "error-status",
+              "name": "status",
+              "value": "error",
+              "type": "string"
+            },
+            {
+              "id": "error-email",
+              "name": "email",
+              "value": "={{ $('Prepare Email Template').item.json.recipientEmail }}",
+              "type": "string"
+            },
+            {
+              "id": "error-business-name",
+              "name": "businessOwnerName",
+              "value": "={{ $('Prepare Email Template').item.json.businessOwnerName }}",
+              "type": "string"
+            },
+            {
+              "id": "error-timestamp",
+              "name": "sentAt",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "error-message",
+              "name": "message",
+              "value": "={{ $json.message || 'Email send failed' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        380
+      ],
+      "id": "log-error-node",
+      "name": "Log Error"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1800,
+        240
+      ],
+      "id": "complete-node",
+      "name": "Complete"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily Schedule (9 AM)": {
+      "main": [
+        [
+          {
+            "node": "Read Business List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Business List": {
+      "main": [
+        [
+          {
+            "node": "Add Batch Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Batch Metadata": {
+      "main": [
+        [
+          {
+            "node": "Log Batch Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Batch Start": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Businesses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Businesses": {
+      "main": [
+        [
+          {
+            "node": "Validate Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Data": {
+      "main": [
+        [
+          {
+            "node": "Prepare Email Template",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Skipped",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Email Template": {
+      "main": [
+        [
+          {
+            "node": "Send Email (Gmail)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email (Gmail)": {
+      "main": [
+        [
+          {
+            "node": "Log Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Success": {
+      "main": [
+        [
+          {
+            "node": "Write Log to Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Skipped": {
+      "main": [
+        [
+          {
+            "node": "Write Log to Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Log to Sheet": {
+      "main": [
+        [
+          {
+            "node": "Wait (Rate Limiting)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait (Rate Limiting)": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Businesses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Send Error": {
+      "main": [
+        [
+          {
+            "node": "Log Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Error": {
+      "main": [
+        [
+          {
+            "node": "Write Log to Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "versionId": "",
+  "meta": {
+    "instanceId": ""
+  },
+  "id": "",
+  "tags": []
+}
